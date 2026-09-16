@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SETU · Listen (speech → text → sign test)</title>
+<style>
+  :root {
+    --canvas:#131317; --surface:#1E1E25; --line:#2B2B34;
+    --text:#ECEAE4; --text-muted:#8B8880;
+    --trust-high:#1D9E75; --trust-mid:#EF9F27; --trust-low:#E24B4A; --enhanced:#7F77DD;
+    --radius-control:10px; --radius-card:14px; --radius-sheet:20px;
+    --font-ui:"Atkinson Hyperlegible Next", system-ui, sans-serif;
+    --font-mono:"Atkinson Hyperlegible Mono", ui-monospace, monospace;
+    --caption-size:20px;
+    --stage:#1d2b3a; --stage2:#223447; --body:#3d5a80; --skinR:#f2c29b; --skinL:#d9a47c; --back:#b98460; --tip:#fff1e0;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--canvas); color:var(--text); font:15px/1.5 var(--font-ui); }
+  header { height:44px; display:flex; align-items:center; gap:12px; padding:0 16px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:15px; margin:0; font-weight:600; }
+  .meta { font:11px var(--font-mono); color:var(--text-muted); }
+  .rec { display:none; align-items:center; gap:6px; font-size:13px; color:var(--trust-low); }
+  .rec.on { display:flex; }
+  .rec::before { content:""; width:10px; height:10px; border-radius:50%; background:var(--trust-low); }
+  main { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:16px; padding:16px; padding-bottom:150px; }
+  @media (max-width: 860px) { main { grid-template-columns:1fr; } }
+  .stage { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-card); padding:16px; min-height:50vh; display:flex; flex-direction:column; }
+  .trustbar { height:4px; background:var(--line); border-radius:2px; overflow:hidden; margin:8px 0 12px; }
+  .trustbar > div { height:100%; width:0; background:var(--trust-low); transition:width 140ms linear, background-color 140ms; }
+  @media (prefers-reduced-motion: reduce) { .trustbar > div { transition:none; } }
+  #captions { display:flex; flex-direction:column; gap:10px; overflow-y:auto; max-height:60vh; }
+  .cap { font-size:var(--caption-size); line-height:1.45; font-weight:500; padding:8px 12px; border-left:4px solid transparent; border-radius:6px; cursor:pointer; }
+  .cap.partial { opacity:.7; border-left:4px solid var(--line); }
+  .cap.emit { border-left:4px solid var(--trust-high); }
+  .cap.repair { border-left:4px dotted var(--trust-mid); }
+  .cap.hold { border:2px dashed var(--trust-low); color:var(--text-muted); font-size:15px; }
+  .cap .spk { font:11px var(--font-mono); color:var(--text-muted); margin-right:8px; text-transform:uppercase; }
+  .badge { display:inline-block; font-size:11px; font-family:var(--font-mono); margin-left:8px; padding:1px 6px; border-radius:4px; vertical-align:middle; }
+  .badge.high { color:var(--trust-high); border:1px solid var(--trust-high); }
+  .badge.medium { color:var(--trust-mid); border:1px dotted var(--trust-mid); }
+  .badge.low { color:var(--trust-low); border:1px dashed var(--trust-low); }
+  .uncertain { text-decoration:underline dotted var(--trust-mid) 2px; text-underline-offset:4px; background:none; border:0; color:inherit; font:inherit; padding:0; cursor:pointer; }
+  .details { font:11px/1.5 var(--font-mono); color:var(--text-muted); white-space:pre-wrap; margin-top:6px; display:none; }
+  .cap.open .details { display:block; }
+  aside section { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-card); padding:12px; margin-bottom:12px; }
+  aside h2 { font-size:13px; margin:0 0 8px; color:var(--text-muted); font-weight:600; }
+  table { width:100%; border-collapse:collapse; font:11px var(--font-mono); }
+  td, th { text-align:right; padding:2px 4px; } td:first-child, th:first-child { text-align:left; }
+  .controls { position:fixed; left:0; right:0; bottom:0; height:130px; background:var(--surface); border-top:1px solid var(--line); border-radius:var(--radius-sheet) var(--radius-sheet) 0 0; display:flex; align-items:center; justify-content:center; gap:12px; padding:0 16px; flex-wrap:wrap; }
+  button, .filebtn { min-height:48px; min-width:48px; padding:0 18px; border-radius:var(--radius-control); border:1px solid var(--line); background:var(--canvas); color:var(--text); font:600 15px var(--font-ui); cursor:pointer; display:inline-flex; align-items:center; }
+  button.primary { background:var(--trust-high); border-color:var(--trust-high); color:#07120e; }
+  button:focus-visible, .filebtn:focus-within, select:focus-visible { outline:3px solid var(--enhanced); outline-offset:2px; }
+  select { min-height:48px; border-radius:var(--radius-control); background:var(--canvas); color:var(--text); border:1px solid var(--line); padding:0 10px; font:15px var(--font-ui); }
+  .filebtn input { position:absolute; opacity:0; width:1px; height:1px; }
+  #repair { position:fixed; left:50%; bottom:146px; transform:translateX(-50%); width:min(560px, calc(100% - 32px)); background:var(--surface); border:2px dotted var(--trust-mid); border-radius:var(--radius-card); padding:16px; display:none; }
+  #repair.on { display:block; }
+  #repair .opts { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 8px; }
+  #repair .opts button { min-height:56px; }
+  #banner { display:none; padding:8px 16px; background:#2a2410; color:var(--trust-mid); font-size:13px; }
+  #banner.on { display:block; }
+  #avatar { width:100%; aspect-ratio:1; image-rendering:pixelated; border-radius:10px; background:var(--stage); display:block; }
+  #avatar.emit { outline:3px solid var(--trust-high); } #avatar.repair { outline:3px dotted var(--trust-mid); } #avatar.hold { outline:3px dashed var(--trust-low); }
+  .gloss { display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; }
+  .gchip { font:12px var(--font-mono); text-transform:uppercase; padding:2px 6px; border:1px solid var(--line); border-radius:6px; }
+  .gchip.fs { border-style:dashed; } .gchip.on { border-color:var(--enhanced); color:var(--enhanced); }
+  #composeForm { display:flex; gap:8px; margin-top:10px; }
+  #composeForm input { flex:1; min-width:0; min-height:48px; border-radius:var(--radius-control); border:1px solid var(--line); background:var(--canvas); color:var(--text); padding:0 10px; font:15px var(--font-ui); }
+  .notice { font-size:11px; color:var(--text-muted); margin-top:auto; padding-top:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SETU · Listen → Sign</h1>
+  <span class="meta" id="engine">not connected</span>
+  <span class="rec" id="rec" role="status">Mic on</span>
+  <span class="meta" id="modestate" style="margin-left:auto"></span>
+</header>
+<div id="banner" role="alert"></div>
+<main>
+  <div class="stage">
+    <div class="meta">Captions · trust bar <span id="trustword">(idle)</span></div>
+    <div class="trustbar" role="meter" aria-label="Confidence" aria-valuemin="0" aria-valuemax="100" id="trustmeter"><div id="trustfill"></div></div>
+    <div id="captions" aria-live="polite" aria-relevant="additions text"></div>
+    <p class="notice">SETU is not a certified interpreter. Use a qualified human interpreter for medical, legal, or emergency situations. Audio stays on this computer and is never saved.</p>
+  </div>
+  <aside>
+    <section aria-labelledby="signH"><h2 id="signH">Sign (ISL avatar · placeholder signs)</h2>
+      <canvas id="avatar" width="100" height="100" role="img" aria-label="Signing avatar, idle"></canvas>
+      <div id="signNow" class="meta" aria-live="polite">Waiting for a caption to sign</div>
+      <div id="signGloss" class="gloss" aria-label="ISL gloss"></div>
+      <div id="signBack" class="meta"></div>
+      <form id="composeForm"><input id="composeText" aria-label="Type text to sign" placeholder="Type to sign…"><button type="submit">Sign it</button></form>
+    </section>
+    <section><h2>Speakers</h2><div id="speakers" class="meta">none yet</div></section>
+    <section><h2>Latency (last 30 s, ms)</h2>
+      <table><thead><tr><th>stage</th><th>p50</th><th>p95</th><th>last</th><th>n</th></tr></thead><tbody id="lat"><tr><td colspan="5">not measured yet</td></tr></tbody></table>
+    </section>
+    <section><h2>Log</h2><div id="log" class="meta" style="max-height:200px;overflow:auto"></div></section>
+  </aside>
+</main>
+
+<div id="repair" role="dialog" aria-labelledby="repairReason">
+  <div id="repairReason" style="font-weight:600"></div>
+  <div class="opts" id="repairOpts"></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button id="neither">Neither — say it again</button>
+  </div>
+  <div class="meta" style="margin-top:8px">Your answer is saved for next time. Keys: 1 / 2 pick, Esc neither.</div>
+</div>
+
+<div class="controls">
+  <button id="mic" class="primary" aria-pressed="false">Start mic</button>
+  <label class="filebtn">Stream a WAV file<input type="file" id="wav" accept="audio/*"></label>
+  <label class="meta" for="ask">Ask me when unsure</label>
+  <select id="ask"><option value="cautious">Cautious</option><option value="balanced" selected>Balanced</option><option value="fluent">Fluent</option></select>
+  <label class="meta" for="size">Caption size</label>
+  <input id="size" type="range" min="16" max="34" value="20" aria-label="Caption size">
+  <button id="clear">Clear</button>
+</div>
+
+<script>
+const SR = 16000, CHUNK = 1600; // 100 ms
+const $ = (id) => document.getElementById(id);
+const BADGE_WORDS = { high: "High confidence", medium: "Medium confidence", low: "Low confidence", enhanced: "Enhanced" };
+const GATE_COLOR = { emit: "var(--trust-high)", repair: "var(--trust-mid)", hold: "var(--trust-low)" };
+let ws = null, ctx = null, node = null, stream = null, seq = 0, pending = new Float32Array(0), wavTimer = null;
+let repairTimer = null, currentRepair = null;
+
+function log(s) { const d = document.createElement("div"); d.textContent = `${new Date().toLocaleTimeString()} ${s}`; $("log").prepend(d); }
+function vibrate(n) { if (navigator.vibrate) navigator.vibrate(n === 2 ? [80, 80, 80] : 80); }
+
+function connect() {
+  return new Promise((resolve, reject) => {
+    if (ws && ws.readyState === 1) return resolve(ws);
+    ws = new WebSocket(`ws://${location.host}/ws/session`);
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: "session.start", mode: "LISTEN", sign_lang: "isl", spoken_langs: ["en"], role: "listener", ask_when_unsure: $("ask").value }));
+    };
+    ws.onmessage = (e) => { const m = JSON.parse(e.data); handle(m); if (m.type === "session.ready") resolve(ws); if (m.type === "error" && m.code === "warming_up") reject(new Error(m.message)); };
+    ws.onclose = () => { banner("Offline — backend connection closed"); stopAll(); ws = null; };
+    ws.onerror = () => reject(new Error("WebSocket error"));
+  });
+}
+
+function banner(text) { const b = $("banner"); b.textContent = text || ""; b.classList.toggle("on", !!text); }
+
+function capEl(id) {
+  let el = document.querySelector(`[data-seg="${id}"]`);
+  if (!el) { el = document.createElement("div"); el.dataset.seg = id; el.className = "cap"; el.tabIndex = 0;
+    el.addEventListener("click", (ev) => { if (!ev.target.classList.contains("uncertain")) el.classList.toggle("open"); });
+    el.addEventListener("keydown", (ev) => { if (ev.key === "Enter") el.classList.toggle("open"); });
+    $("captions").append(el); }
+  el.scrollIntoView({ block: "end" });
+  return el;
+}
+
+function spk(label) { return label ? `<span class="spk">${label}</span>` : ""; }
+function esc(s) { return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+function renderText(text, spans, lattice) {
+  if (!spans || !spans.length) return esc(text);
+  let out = "", pos = 0;
+  for (const [a, b] of [...spans].sort((x, y) => x[0] - y[0])) {
+    const word = text.slice(a, b);
+    const slot = lattice && lattice.find((s) => s.cands[0] && s.cands[0].value === word);
+    const alts = slot ? slot.cands.slice(1).map((c) => c.value || "(nothing)").join(", ") : "";
+    out += esc(text.slice(pos, a)) + `<button class="uncertain" aria-label="Uncertain word ${esc(word)}. Alternatives: ${esc(alts)}" title="Maybe: ${esc(alts)}">${esc(word)}</button>`;
+    pos = b;
+  }
+  return out + esc(text.slice(pos));
+}
+
+function latticeDetails(p) {
+  if (!p) return "";
+  const rows = p.lattice.map((s) => `${String(s.slot).padStart(2)}  ${s.cands.map((c) => `${c.value || "∅"} ${c.score.toFixed(2)}`).join("  |  ")}`);
+  return `source ${p.source} · lang ${p.lang_hint} · trust ${p.trust} · snr ${p.quality.snr_db} dB · ${p.t0}–${p.t1} ms\n` + rows.join("\n");
+}
+
+function renderPlan(segId, plan, percept) {
+  const cap = plan.targets.find((t) => t.kind === "caption");
+  const el = capEl(segId);
+  el.className = `cap ${plan.gate}`;
+  el.innerHTML = `${spk(cap.speaker_label)}${renderText(cap.text, cap.uncertain_spans, percept && percept.lattice)}<span class="badge ${cap.trust_badge}">${BADGE_WORDS[cap.trust_badge]}</span><div class="details">${esc(latticeDetails(percept))}</div>`;
+}
+
+function showRepair(segId, plan) {
+  currentRepair = { segId, frameId: plan.frame_id };
+  $("repairReason").textContent = plan.repair.reason;
+  const opts = $("repairOpts"); opts.innerHTML = "";
+  plan.repair.options.forEach((o, i) => {
+    const b = document.createElement("button"); b.textContent = `${i + 1}. ${o.label || o.gloss_or_word}`;
+    b.onclick = () => pickRepair(o.gloss_or_word); opts.append(b);
+  });
+  $("repair").classList.add("on"); vibrate(1);
+  clearTimeout(repairTimer);
+  repairTimer = setTimeout(() => { if (currentRepair) { holdCard(currentRepair.segId, "No answer — held"); closeRepair(); } }, 8000);
+}
+function closeRepair() { $("repair").classList.remove("on"); currentRepair = null; clearTimeout(repairTimer); }
+function pickRepair(choice) {
+  if (!currentRepair) return;
+  ws && ws.send(JSON.stringify({ type: "repair.pick", frame_id: currentRepair.frameId, choice }));
+  log(`picked "${choice}"`); closeRepair();
+}
+$("neither").onclick = () => { if (!currentRepair) return; ws && ws.send(JSON.stringify({ type: "repair.neither", frame_id: currentRepair.frameId })); holdCard(currentRepair.segId, "Please say that again"); closeRepair(); };
+document.addEventListener("keydown", (e) => {
+  if (!currentRepair) return;
+  if (e.key === "Escape") $("neither").click();
+  const btns = $("repairOpts").querySelectorAll("button");
+  if (e.key === "1" && btns[0]) btns[0].click();
+  if (e.key === "2" && btns[1]) btns[1].click();
+});
+
+function holdCard(segId, reason) {
+  const el = capEl(segId); el.className = "cap hold";
+  el.innerHTML = `Held: ${esc(reason)}<span class="badge low">${BADGE_WORDS.low}</span>`; vibrate(2);
+}
+
+function handle(m) {
+  switch (m.type) {
+    case "session.ready":
+      $("engine").textContent = `asr ${m.asr} · diarizer ${m.diarizer} · vad ${m.vad} · trust ${m.trust_calibrated ? "calibrated" : "uncalibrated"}`;
+      banner(""); log(`session ${m.session_id}`); break;
+    case "mode.state":
+      $("modestate").textContent = `${m.mode}${m.warming ? " · Warming up…" : ""} · VRAM used ${m.vram_mb ?? "?"} MB free ${m.vram_free_mb ?? "?"} MB · cloud ${m.cloud ? "on" : "off"}`;
+      if (m.warning) banner(m.warning); break;
+    case "caption.partial": {
+      const el = capEl(m.segment_id);
+      if (!el.classList.contains("emit") && !el.classList.contains("repair")) { el.className = "cap partial"; el.innerHTML = spk(m.speaker_label) + esc(m.text); }
+      break; }
+    case "caption.final": renderPlan(m.segment_id, m.plan, m.percept); break;
+    case "repair.request": renderPlan(m.segment_id, m.plan, m.percept); showRepair(m.segment_id, m.plan); break;
+    case "hold": holdCard(m.segment_id || `hold_${Date.now()}`, m.reason); break;
+    case "trust.tick": {
+      $("trustfill").style.width = `${Math.round(m.value * 100)}%`;
+      $("trustfill").style.background = GATE_COLOR[m.gate];
+      $("trustmeter").setAttribute("aria-valuenow", Math.round(m.value * 100));
+      $("trustword").textContent = `(last: ${m.gate === "emit" ? "high" : m.gate === "repair" ? "medium" : "low"} confidence)`;
+      break; }
+    case "speaker.update":
+      $("speakers").innerHTML = m.speakers.map((s) => `<div>● ${s.label}</div>`).join(""); break;
+    case "latency": log(`${m.stage}: ${m.ms} ms`); break;
+    case "render.plan": onSignPlan(m); break;
+    case "error": log(`error ${m.code}: ${m.message}`); if (m.code === "warming_up") banner(m.message); break;
+  }
+}
+
+/* ------------------------------------------------------------ sign avatar (render.plan) */
+const av = $("avatar").getContext("2d");
+const cssv = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const FINGERS = [[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16],[17,18,19,20]];
+function px(c, x, y, s = 1) { c.fillRect(Math.round(x), Math.round(y), s, s); }
+function seg(c, x0, y0, x1, y1, s = 1) {
+  x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+  const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let e = dx + dy;
+  for (;;) { c.fillRect(x0 - (s > 1 ? 1 : 0), y0 - (s > 1 ? 1 : 0), s, s); if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * e; if (e2 >= dy) { e += dy; x0 += sx; } if (e2 <= dx) { e += dx; y0 += sy; } }
+}
+function poly(c, pts) {
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  for (let y = Math.floor(Math.min(...ys)); y <= Math.ceil(Math.max(...ys)); y++)
+    for (let x = Math.floor(Math.min(...xs)); x <= Math.ceil(Math.max(...xs)); x++) {
+      let inside = false;
+      for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const [xi, yi] = pts[i], [xj, yj] = pts[j];
+        if (((yi > y + .5) !== (yj > y + .5)) && (x + .5 < (xj - xi) * (y + .5 - yi) / (yj - yi) + xi)) inside = !inside;
+      }
+      if (inside) c.fillRect(x, y, 1, 1);
+    }
+}
+function drawHand(c, H, palm, skin) {
+  const col = palm < 0 ? cssv("--back") : skin;
+  c.fillStyle = col; poly(c, [H[0], H[1], H[5], H[9], H[13], H[17]]);
+  for (const f of FINGERS) { c.fillStyle = col; seg(c, ...H[f[0] === 1 ? 0 : f[0]], ...H[f[0]], 2);
+    for (let k = 0; k < 3; k++) seg(c, ...H[f[k]], ...H[f[k + 1]], 2);
+    c.fillStyle = cssv("--tip"); px(c, ...H[f[3]]); }
+}
+function drawBody(c, face) {
+  const cx = 50 + (face.hx || 0), cy = 22 + (face.hy || 0);
+  c.fillStyle = cssv("--stage"); c.fillRect(0, 0, 100, 100);
+  c.fillStyle = cssv("--stage2"); for (let y = 0; y < 100; y += 4) c.fillRect(0, y, 100, 1);
+  c.fillStyle = cssv("--body"); poly(c, [[30,44],[70,44],[76,100],[24,100]]); c.fillRect(46, 32, 8, 13);
+  c.fillStyle = cssv("--skinR");
+  for (let y = -10; y <= 10; y++) for (let x = -8; x <= 8; x++) if ((x*x)/64 + (y*y)/100 <= 1) c.fillRect(Math.round(cx+x), Math.round(cy+y), 1, 1);
+  c.fillStyle = "#2b2b2b";
+  for (let x = -8; x <= 8; x++) for (let y = -10; y <= -6; y++) if ((x*x)/64 + (y*y)/100 <= 1) c.fillRect(Math.round(cx+x), Math.round(cy+y), 1, 1);
+  c.fillStyle = "#1a1a1a"; px(c, cx-4, cy-1, 2); px(c, cx+3, cy-1, 2);
+  c.fillStyle = "#3a2a20";
+  if (face.brow === "raised") { seg(c, cx-5, cy-5, cx-2, cy-5); seg(c, cx+2, cy-5, cx+5, cy-5); }
+  else if (face.brow === "furrowed") { seg(c, cx-5, cy-4, cx-2, cy-2); seg(c, cx+2, cy-2, cx+5, cy-4); }
+  else { seg(c, cx-5, cy-3, cx-2, cy-3); seg(c, cx+2, cy-3, cx+5, cy-3); }
+  c.fillStyle = "#8a3b3b";
+  if (face.mouth === "open") c.fillRect(Math.round(cx-2), Math.round(cy+4), 4, 3); else seg(c, cx-2, cy+5, cx+2, cy+5);
+}
+function drawFrame(f) { drawBody(av, f.face || {}); drawHand(av, f.L, f.Lp, cssv("--skinL")); drawHand(av, f.R, f.Rp, cssv("--skinR")); }
+drawBody(av, {});
+
+const signQueue = []; let signPlaying = false;
+function onSignPlan(m) {
+  const plan = m.plan, sign = plan.targets.find((t) => t.kind === "sign");
+  log(`sign ${m.origin} ${plan.gate}: ${(m.frame && m.frame.gloss || []).join(" ")} (${plan.timings_ms["sign.total"] ?? "?"} ms)`);
+  if (plan.gate === "emit" && sign && m.frames) { signQueue.push(m); if (!signPlaying) nextSign(); return; }
+  $("avatar").className = plan.gate;
+  if (plan.gate === "repair" && plan.repair) {
+    showSignInfo(m, `Not signed yet: ${plan.repair.reason}`);
+    showRepair(m.segment_id || `sign_${plan.frame_id}`, plan);
+  } else {
+    showSignInfo(m, `Not signed: ${plan.repair ? plan.repair.reason : "held"}`);   // hold: rest pose, caption only
+    drawBody(av, {}); vibrate(2);
+  }
+}
+function showSignInfo(m, text) {
+  const sign = m.plan.targets.find((t) => t.kind === "sign");
+  $("signNow").textContent = text;
+  $("signGloss").innerHTML = sign ? sign.gloss.map((g, k) => `<span class="gchip${g.fingerspelled ? " fs" : ""}" data-gi="${k}" title="read-back ${Math.round((g.roundtrip ?? 0) * 100)}%">${esc(g.fingerspelled ? (g.fs_fallback || g.g) : g.g)}</span>`).join("") : "";
+  $("signBack").textContent = sign && sign.back_translation ? `Reads back as: ${sign.back_translation}` : "";
+}
+function nextSign() {
+  const m = signQueue.shift(); if (!m) { signPlaying = false; return; }
+  signPlaying = true; $("avatar").className = "emit";
+  const cap = m.plan.targets.find((t) => t.kind === "caption");
+  showSignInfo(m, `Signing${cap && cap.speaker_label ? ` (${cap.speaker_label})` : ""}: ${cap ? cap.text : ""}`);
+  $("avatar").setAttribute("aria-label", `Signing avatar: ${(m.frame && m.frame.gloss || []).join(" ")}`);
+  const F = m.frames.frames, t0 = performance.now(), step = 1000 / m.frames.fps;
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function tick(now) {
+    const i = Math.floor((now - t0) / step);
+    if (i >= F.length) { drawBody(av, {}); document.querySelectorAll(".gchip").forEach((e) => e.classList.remove("on")); return setTimeout(nextSign, 250); }
+    const f = F[i]; drawFrame(reduced ? { ...f, face: { ...f.face, hx: 0, hy: 0 } } : f);
+    document.querySelectorAll(".gchip").forEach((e) => e.classList.toggle("on", +e.dataset.gi === f.gi));
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+$("composeForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const text = $("composeText").value.trim(); if (!text) return;
+  try { await connect(); } catch (err) { banner(err.message); return; }
+  ws.send(JSON.stringify({ type: "compose.text", text, target_sign_lang: "isl" }));
+};
+
+function sendPcm(f32) {
+  const joined = new Float32Array(pending.length + f32.length); joined.set(pending); joined.set(f32, pending.length);
+  let off = 0;
+  while (joined.length - off >= CHUNK) {
+    const part = joined.subarray(off, off + CHUNK); off += CHUNK;
+    const i16 = new Int16Array(CHUNK);
+    for (let i = 0; i < CHUNK; i++) { const v = Math.max(-1, Math.min(1, part[i])); i16[i] = v < 0 ? v * 0x8000 : v * 0x7fff; }
+    const bytes = new Uint8Array(i16.buffer); let bin = "";
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "audio.chunk", seq: seq++, pcm16_b64: btoa(bin), t: Math.round(performance.now()) }));
+  }
+  pending = joined.slice(off);
+}
+
+const WORKLET = `class Tap extends AudioWorkletProcessor { process(inputs) { const ch = inputs[0][0]; if (ch) this.port.postMessage(ch.slice(0)); return true; } } registerProcessor("tap", Tap);`;
+
+async function startMic() {
+  await connect();
+  stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: false, autoGainControl: true } });
+  ctx = new AudioContext({ sampleRate: SR });
+  await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" })));
+  const src = ctx.createMediaStreamSource(stream);
+  node = new AudioWorkletNode(ctx, "tap");
+  node.port.onmessage = (e) => sendPcm(e.data);
+  src.connect(node);
+  $("mic").textContent = "Stop mic"; $("mic").setAttribute("aria-pressed", "true"); $("rec").classList.add("on");
+}
+
+function stopAll() {
+  if (stream) stream.getTracks().forEach((t) => t.stop());
+  if (ctx) ctx.close();
+  clearInterval(wavTimer); wavTimer = null;
+  stream = ctx = node = null; pending = new Float32Array(0);
+  $("mic").textContent = "Start mic"; $("mic").setAttribute("aria-pressed", "false"); $("rec").classList.remove("on");
+}
+
+$("mic").onclick = async () => {
+  if (stream) return stopAll();
+  try { await startMic(); } catch (e) { log(e.message); banner(e.message); }
+};
+
+$("wav").onchange = async (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  try { await connect(); } catch (err) { banner(err.message); return; }
+  const dec = new OfflineAudioContext(1, 1, SR);
+  const buf = await dec.decodeAudioData(await file.arrayBuffer());   // resampled to 16 kHz
+  const data = buf.getChannelData(0);
+  log(`streaming ${file.name} (${buf.duration.toFixed(1)} s) in real time`);
+  let pos = 0; const t0 = performance.now();
+  clearInterval(wavTimer);
+  wavTimer = setInterval(() => {
+    const due = Math.min(data.length, Math.floor((performance.now() - t0) / 1000 * SR));
+    if (due > pos) { sendPcm(data.subarray(pos, due)); pos = due; }
+    if (pos >= data.length) { clearInterval(wavTimer); sendPcm(new Float32Array(SR)); log("file done"); }
+  }, 50);
+  e.target.value = "";
+};
+
+$("ask").onchange = () => { if (ws) { ws.close(); } };
+$("size").oninput = (e) => document.documentElement.style.setProperty("--caption-size", `${e.target.value}px`);
+$("clear").onclick = () => { $("captions").innerHTML = ""; };
+
+async function pollLatency() {
+  try {
+    const r = await fetch("/diag/latency?window_s=30"); const j = await r.json();
+    const rows = Object.entries(j.stages).sort();
+    $("lat").innerHTML = rows.length ? rows.map(([k, v]) => `<tr><td>${k}</td><td>${v.p50}</td><td>${v.p95}</td><td>${Math.round(v.last)}</td><td>${v.n}</td></tr>`).join("")
+      : `<tr><td colspan="5">not measured yet</td></tr>`;
+  } catch { /* offline banner handled by ws */ }
+}
+setInterval(pollLatency, 2000);
+</script>
+</body>
+</html>

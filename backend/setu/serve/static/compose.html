@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SETU Compose</title>
+<style>
+:root{
+  --bg:#131317; --panel:#1E1E25; --ink:#ECEAE4; --muted:#8B8880; --line:#2B2B34;
+  --accent:#7F77DD; --emit:#1D9E75; --repair:#EF9F27; --hold:#E24B4A; --chip:#26262E;
+  --stage:#1d2b3a; --stage2:#223447; --body:#3d5a80; --skinR:#f2c29b; --skinL:#d9a47c;
+  --back:#b98460; --tip:#fff1e0;
+  --font-ui:"Atkinson Hyperlegible Next", system-ui, sans-serif;
+  --font-mono:"Atkinson Hyperlegible Mono", ui-monospace, monospace;
+}
+:root[data-theme="light"]{
+  --bg:#f4f1ea; --panel:#fffdf8; --ink:#1f2328; --muted:#595f68; --line:#e2ddd2;
+  --accent:#4b43b8; --emit:#146c50; --repair:#8a5a0f; --hold:#a93a33; --chip:#f0ece3;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--font-ui)}
+header{padding:18px 24px 6px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+header h1{font-size:20px;margin:0;letter-spacing:.2px}
+header span{color:var(--muted);font-size:13px}
+#mode{margin-left:auto;font:12px ui-monospace,monospace;color:var(--muted)}
+main{display:grid;grid-template-columns:minmax(300px,520px) 1fr;gap:20px;padding:12px 24px 32px;max-width:1280px}
+@media (max-width:860px){main{grid-template-columns:1fr;padding:12px 16px}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+#stageWrap{position:relative}
+canvas#stage{width:100%;aspect-ratio:1;image-rendering:pixelated;border-radius:8px;display:block;background:var(--stage)}
+#nowGloss{position:absolute;left:12px;top:10px;font:600 22px ui-monospace,monospace;color:#fff;text-shadow:0 2px 0 #0008}
+#nowLetter{position:absolute;right:14px;top:8px;font:700 34px ui-monospace,monospace;color:#ffd48a;text-shadow:0 2px 0 #0008}
+.transport{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+button:focus-visible,textarea:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button{min-height:48px;font:inherit;border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:7px;padding:6px 11px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+input[type=range]{flex:1;min-width:120px;accent-color:var(--accent)}
+label.tog{font-size:13px;color:var(--muted);display:flex;gap:4px;align-items:center}
+textarea{width:100%;min-height:64px;font:inherit;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);resize:vertical}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 0}
+.chip{font-size:12.5px;padding:3px 9px;border-radius:99px;background:var(--chip);border:1px solid var(--line);cursor:pointer;color:var(--ink)}
+.side{display:flex;flex-direction:column;gap:14px;min-width:0}
+h3{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.gate{display:flex;align-items:center;gap:10px}
+.pill{font:700 12px ui-monospace,monospace;padding:4px 10px;border-radius:6px;color:#fff;text-transform:uppercase}
+.pill.emit{background:var(--emit)}.pill.repair{background:var(--repair);outline:2px dotted #fff8}.pill.hold{background:var(--hold);outline:2px dashed #fff8}
+.meter{height:8px;border-radius:4px;background:var(--chip);overflow:hidden;flex:1;min-width:80px}
+.meter i{display:block;height:100%}
+#reason{color:var(--muted);font-size:13.5px;margin-top:6px}
+.strip{display:flex;gap:6px;flex-wrap:wrap}
+.g{border:1px solid var(--line);border-radius:7px;padding:5px 8px;background:var(--bg);font:600 13px ui-monospace,monospace;cursor:pointer;min-width:60px}
+.g small{display:block;font:500 11px ui-monospace,monospace;color:var(--muted)}
+.g.on{outline:2px solid var(--accent);background:var(--chip)}
+.g.fs{border-style:dashed}
+.g .bar{height:3px;border-radius:2px;margin-top:4px;background:var(--chip)}
+.g .bar i{display:block;height:100%}
+.back{font-size:15px;margin-top:8px}
+.back b{font-weight:600}
+.advisory{background:color-mix(in srgb,var(--hold) 14%,transparent);border:1px solid var(--hold);border-radius:8px;padding:9px 12px;font-size:13.5px}
+.repair{border:2px solid var(--repair)}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.opt{border:1px solid var(--line);border-radius:8px;padding:8px;text-align:center;background:var(--bg)}
+.opt canvas{width:100%;aspect-ratio:1;image-rendering:pixelated;border-radius:6px;background:var(--stage)}
+.cap{font-size:15px}
+.badge{font:600 11px ui-monospace,monospace;padding:2px 7px;border-radius:5px;margin-left:6px;color:#fff}
+.badge.high{background:var(--emit)}.badge.medium{background:var(--repair)}.badge.low{background:var(--hold)}
+pre{max-height:320px;overflow:auto;background:var(--bg);border-radius:8px;padding:10px;font-size:11.5px;margin:8px 0 0;white-space:pre-wrap;word-break:break-word}
+.muted{color:var(--muted);font-size:13px}
+.err{color:var(--hold)}
+details summary{cursor:pointer;color:var(--muted);font-size:13px}
+.lat{font:12px ui-monospace,monospace;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1>SETU · Compose (text → sign)</h1>
+  <span>Layer 2 test page. Placeholder signs, not validated ISL. SETU is not a certified interpreter.</span>
+  <label class="tog" id="mode">Ask me when unsure
+    <select id="ask"><option value="cautious">Cautious</option><option value="balanced" selected>Balanced</option><option value="fluent">Fluent</option></select>
+    <button id="theme" type="button">Light theme</button></label>
+</header>
+<main>
+  <section>
+    <div class="card">
+      <div id="stageWrap">
+        <canvas id="stage" width="100" height="100" role="img" aria-label="Signing avatar"></canvas>
+        <div id="nowGloss"></div><div id="nowLetter"></div>
+      </div>
+      <div class="transport">
+        <button id="play" class="primary">▶ Play</button>
+        <button id="stepB" aria-label="Previous frame">⟨ Back</button>
+        <button id="stepF" aria-label="Next frame">Next ⟩</button>
+        <input id="scrub" type="range" min="0" max="0" value="0" aria-label="Timeline">
+        <select id="speed" aria-label="Speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="0.25">0.25×</option></select>
+      </div>
+      <div class="transport">
+        <label class="tog"><input type="checkbox" id="loop" checked> loop</label>
+        <label class="tog"><input type="checkbox" id="dbg"> landmarks</label>
+        <label class="tog"><input type="checkbox" id="trail"> motion trail</label>
+        <span class="muted" id="clock" style="margin-left:auto"></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="side">
+    <div class="card">
+      <h3>Author</h3>
+      <textarea id="text" aria-label="Text to sign" placeholder="Type English, Hindi or Hinglish…">I went to the bank yesterday.</textarea>
+      <div class="row" style="margin-top:8px">
+        <button id="go" class="primary">Translate to sign</button>
+        <span class="muted" id="status" role="status"></span>
+      </div>
+      <div class="chips" id="examples"></div>
+    </div>
+
+    <div id="advisory" class="advisory" hidden></div>
+
+    <div class="card" id="gateCard" hidden>
+      <h3>Gate</h3>
+      <div class="gate">
+        <span class="pill" id="gatePill"></span>
+        <div class="meter"><i id="trustBar"></i></div>
+        <span class="lat" id="trustNum"></span>
+      </div>
+      <div id="reason"></div>
+    </div>
+
+    <div class="card repair" id="repairCard" role="dialog" aria-labelledby="repairPrompt" hidden>
+      <h3>Repair</h3>
+      <div id="repairPrompt" style="font-weight:600"></div>
+      <div class="opts" id="repairOpts"></div>
+    </div>
+
+    <div class="card" id="glossCard" hidden>
+      <h3>ISL gloss (click to jump)</h3>
+      <div class="strip" id="strip"></div>
+      <div class="back">Reads back as: <b id="back"></b></div>
+      <div class="muted" style="margin-top:4px">This comes from running the recognizer on the rendered avatar. If it doesn't match what you meant, don't send.</div>
+    </div>
+
+    <div class="card" id="capCard" hidden>
+      <h3>Caption</h3>
+      <div class="cap" aria-live="polite"><span id="capText"></span><span id="capBadge" class="badge"></span></div>
+      <div class="muted" id="capForced"></div>
+    </div>
+
+    <div class="card" id="rawCard" hidden>
+      <details><summary>Raw contracts (SemanticFrame, RenderPlan, read-back lattice) and timings</summary>
+        <div class="lat" id="timings" style="margin-top:6px"></div>
+        <pre id="raw"></pre>
+      </details>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ------------------------------------------------------------------ data source */
+const $ = id => document.getElementById(id);
+const EXAMPLES = [
+  "I went to the bank yesterday.",
+  "What is your name?",
+  "Do you want water?",
+  "I don't understand.",
+  "My name is Priya.",
+  "mujhe kal bank jaana hai",
+  "main kal ghar gaya tha",
+  "Where is the toilet?",
+  "I have pain, I need medicine.",
+  "Good morning! See you tomorrow.",
+];
+for (const ex of EXAMPLES) {
+  const c = document.createElement("button"); c.className = "chip"; c.textContent = ex;
+  c.onclick = () => { $("text").value = ex; run(); };
+  $("examples").appendChild(c);
+}
+$("theme").onclick = () => {
+  const light = document.documentElement.dataset.theme !== "light";
+  document.documentElement.dataset.theme = light ? "light" : "dark";
+  $("theme").textContent = light ? "Dark theme" : "Light theme";
+  if (cur && cur.frames) setIndex(idx); else drawBody(stage, {brow:"neutral"});
+};
+
+async function translate(text, resolutions) {
+  const res = await fetch("/api/text-to-sign", {method:"POST", headers:{"Content-Type":"application/json"},
+                          body: JSON.stringify({text, resolutions: resolutions||{}, ask_when_unsure: $("ask").value})});
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+  return res.json();
+}
+async function signClip(g) {
+  const r = await fetch("/api/sign/" + encodeURIComponent(g));
+  return r.ok ? r.json() : null;
+}
+
+/* ------------------------------------------------------------------ pixel renderer */
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function px(ctx, x, y, s=1){ ctx.fillRect(Math.round(x), Math.round(y), s, s); }
+function line(ctx, x0, y0, x1, y1, s=1){
+  x0=Math.round(x0); y0=Math.round(y0); x1=Math.round(x1); y1=Math.round(y1);
+  const dx=Math.abs(x1-x0), dy=-Math.abs(y1-y0), sx=x0<x1?1:-1, sy=y0<y1?1:-1; let e=dx+dy;
+  for(;;){ ctx.fillRect(x0 - (s>1?1:0), y0 - (s>1?1:0), s, s); if(x0===x1&&y0===y1)break;
+    const e2=2*e; if(e2>=dy){e+=dy;x0+=sx;} if(e2<=dx){e+=dx;y0+=sy;} }
+}
+function poly(ctx, pts){
+  const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]);
+  for(let y=Math.floor(Math.min(...ys)); y<=Math.ceil(Math.max(...ys)); y++){
+    for(let x=Math.floor(Math.min(...xs)); x<=Math.ceil(Math.max(...xs)); x++){
+      let inside=false;
+      for(let i=0,j=pts.length-1;i<pts.length;j=i++){
+        const [xi,yi]=pts[i],[xj,yj]=pts[j];
+        if(((yi>y+.5)!==(yj>y+.5)) && (x+.5 < (xj-xi)*(y+.5-yi)/(yj-yi)+xi)) inside=!inside;
+      }
+      if(inside) ctx.fillRect(x,y,1,1);
+    }
+  }
+}
+const FINGERS=[[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16],[17,18,19,20]];
+
+function drawHand(ctx, H, palm, skin, debug){
+  const back = palm < 0;
+  ctx.fillStyle = back ? css("--back") : skin;
+  poly(ctx, [H[0], H[1], H[5], H[9], H[13], H[17]]);
+  for (const f of FINGERS){
+    ctx.fillStyle = back ? css("--back") : skin;
+    line(ctx, ...H[f[0]===1?0:f[0]], ...H[f[0]], 2);
+    for (let k=0;k<3;k++) line(ctx, ...H[f[k]], ...H[f[k+1]], 2);
+    ctx.fillStyle = css("--tip"); px(ctx, ...H[f[3]]);
+  }
+  if (debug){ ctx.fillStyle = "#ff3df2"; for (const p of H) px(ctx, ...p); }
+}
+
+function drawBody(ctx, face){
+  const hx = face.hx||0, hy = face.hy||0;
+  ctx.fillStyle = css("--stage"); ctx.fillRect(0,0,100,100);
+  ctx.fillStyle = css("--stage2"); for (let y=0;y<100;y+=4) ctx.fillRect(0,y,100,1);
+  // torso + neck
+  ctx.fillStyle = css("--body");
+  poly(ctx, [[30,44],[70,44],[76,100],[24,100]]);
+  ctx.fillRect(46,32,8,13);
+  // head
+  ctx.fillStyle = css("--skinR");
+  const cx = 50+hx, cy = 22+hy;
+  for (let y=-10;y<=10;y++) for (let x=-8;x<=8;x++) if ((x*x)/64+(y*y)/100<=1) ctx.fillRect(Math.round(cx+x),Math.round(cy+y),1,1);
+  ctx.fillStyle = "#2b2b2b";          // hair
+  for (let x=-8;x<=8;x++) for (let y=-10;y<=-6;y++) if ((x*x)/64+(y*y)/100<=1) ctx.fillRect(Math.round(cx+x),Math.round(cy+y),1,1);
+  // eyes
+  ctx.fillStyle = "#1a1a1a"; px(ctx,cx-4,cy-1,2); px(ctx,cx+3,cy-1,2);
+  // brows: the question grammar lives here
+  ctx.fillStyle = "#3a2a20";
+  const b = face.brow;
+  if (b==="raised"){ line(ctx,cx-5,cy-5,cx-2,cy-5); line(ctx,cx+2,cy-5,cx+5,cy-5); }
+  else if (b==="furrowed"){ line(ctx,cx-5,cy-4,cx-2,cy-2); line(ctx,cx+2,cy-2,cx+5,cy-4); }
+  else { line(ctx,cx-5,cy-3,cx-2,cy-3); line(ctx,cx+2,cy-3,cx+5,cy-3); }
+  // mouth
+  ctx.fillStyle = "#8a3b3b";
+  if (face.mouth==="open") ctx.fillRect(Math.round(cx-2),Math.round(cy+4),4,3);
+  else line(ctx,cx-2,cy+5,cx+2,cy+5);
+}
+
+function drawFrame(ctx, f, opts={}){
+  drawBody(ctx, f.face || {});
+  if (opts.trail && opts.frames){
+    ctx.fillStyle = "#ffd48a55";
+    const i = opts.index;
+    for (let k=Math.max(0,i-12); k<i; k++){ const g=opts.frames[k]; px(ctx, ...g.R[8]); px(ctx, ...g.L[8]); }
+  }
+  // draw the hand that is further "back" first: left (non-dominant) then right
+  drawHand(ctx, f.L, f.Lp, css("--skinL"), opts.debug);
+  drawHand(ctx, f.R, f.Rp, css("--skinR"), opts.debug);
+}
+
+/* ------------------------------------------------------------------ player */
+const stage = $("stage").getContext("2d");
+let cur = null, playing = false, t0 = 0, idx = 0, raf = 0;
+
+function setIndex(i){
+  if (!cur || !cur.frames) return;
+  const F = cur.frames.frames;
+  idx = Math.max(0, Math.min(F.length-1, i));
+  const f = F[idx];
+  drawFrame(stage, f, {debug:$("dbg").checked, trail:$("trail").checked, frames:F, index:idx});
+  $("scrub").value = idx;
+  const gl = cur.plan.targets.find(t=>t.kind==="sign").gloss;
+  $("nowGloss").textContent = f.gi >= 0 ? (gl[f.gi].fingerspelled ? "FS" : gl[f.gi].g) : "";
+  $("nowLetter").textContent = f.ch || "";
+  document.querySelectorAll(".g").forEach((el,k)=>el.classList.toggle("on", k===f.gi));
+  $("clock").textContent = `${f.t} / ${cur.frames.total_ms} ms · brow ${f.face.brow} · head ${f.face.head}`;
+}
+function tick(now){
+  if (!playing) return;
+  const F = cur.frames.frames, speed = +$("speed").value;
+  let i = Math.floor(((now - t0) * speed) / (1000 / cur.frames.fps));
+  if (i >= F.length){
+    if ($("loop").checked){ t0 = now + 400; i = 0; } else { playing=false; $("play").textContent="▶ Play"; i = F.length-1; }
+  }
+  if (i >= 0) setIndex(i);
+  raf = requestAnimationFrame(tick);
+}
+function play(){ if(!cur || !cur.frames) return; playing = true; $("play").textContent="❚❚ Pause";
+  t0 = performance.now() - idx * (1000/cur.frames.fps) / +$("speed").value; cancelAnimationFrame(raf); raf = requestAnimationFrame(tick); }
+function pause(){ playing = false; $("play").textContent="▶ Play"; }
+$("play").onclick = () => playing ? pause() : play();
+$("stepF").onclick = () => { pause(); setIndex(idx+1); };
+$("stepB").onclick = () => { pause(); setIndex(idx-1); };
+$("scrub").oninput = e => { pause(); setIndex(+e.target.value); };
+["dbg","trail"].forEach(k => $(k).onchange = () => setIndex(idx));
+
+/* mini players for repair options */
+const minis = []; let miniRunning = false;
+function miniLoop(now){
+  for (const m of minis){
+    const F = m.clip.frames; const i = Math.floor((now/ (1000/m.clip.fps))) % (F.length + 10);
+    drawFrame(m.ctx, F[Math.min(i, F.length-1)]);
+  }
+  if (minis.length) requestAnimationFrame(miniLoop); else miniRunning = false;
+}
+
+/* ------------------------------------------------------------------ UI binding */
+let lastText = "", lastRes = {};
+function colorFor(p){ return p >= .85 ? css("--emit") : p >= .7 ? css("--repair") : css("--hold"); }
+
+async function run(resolutions){
+  const text = $("text").value.trim();
+  lastText = text; lastRes = resolutions || {};
+  $("status").textContent = "…"; $("status").className = "muted";
+  try{
+    const r = await translate(text, lastRes);
+    render(r);
+    $("status").textContent = "";
+  }catch(e){ $("status").textContent = e.message; $("status").className = "err"; }
+}
+$("go").onclick = () => run();
+$("text").addEventListener("keydown", e => { if (e.key==="Enter" && (e.metaKey||e.ctrlKey)) run(); });
+
+const GATE_WORDS = {emit: "Emit — clear to sign", repair: "Repair — check before sending", hold: "Hold — not signed"};
+async function render(r){
+  cur = r; pause();
+  const plan = r.plan, sign = plan.targets.find(t=>t.kind==="sign"), cap = plan.targets.find(t=>t.kind==="caption");
+  for (const id of ["gateCard","rawCard"]) $(id).hidden = false;
+  $("glossCard").hidden = !sign; $("capCard").hidden = !cap;
+  // gate
+  $("gatePill").textContent = GATE_WORDS[plan.gate]; $("gatePill").className = "pill " + plan.gate;
+  const trust = r.frame.trust;
+  $("trustBar").style.width = (trust*100)+"%"; $("trustBar").style.background = colorFor(trust);
+  $("trustNum").textContent = sign ? `trust ${trust.toFixed(2)} · round-trip ${(sign.roundtrip_score ?? 0).toFixed(2)}` : "";
+  $("reason").textContent = plan.gate_reason || (plan.repair && plan.repair.reason) || "";
+  $("advisory").hidden = !plan.advisory; $("advisory").textContent = plan.advisory || "";
+  // gloss strip
+  const strip = $("strip"); strip.innerHTML = "";
+  if (sign) sign.gloss.forEach((g, k) => {
+    const el = document.createElement("button"); el.className = "g" + (g.fingerspelled ? " fs" : "");
+    const p = g.roundtrip ?? 0;
+    const unresolved = plan.repair && plan.repair.type === "disambiguate" && plan.repair.slot === k;
+    const label = (g.fingerspelled ? (g.g.startsWith("FS:") ? g.fs_fallback : `${g.g} → ${g.fs_fallback}`) : g.g) + (unresolved ? " ?" : "");
+    const rb = r.readback[k];
+    const lat = rb ? rb.cands.map(c=>`${c.value} ${(c.score*100).toFixed(0)}%`).join(", ") : "";
+    el.title = "recognizer read-back: " + lat;
+    el.setAttribute("aria-label", `${label}. ${g.fingerspelled ? "Fingerspelled. " : ""}Read back ${(p*100).toFixed(0)} percent: ${lat}`);
+    if (unresolved) el.style.borderColor = css("--repair");
+    el.innerHTML = `${label}<small>${unresolved ? "unresolved · " : ""}${g.fingerspelled ? "fingerspelled · " : ""}read-back ${(p*100).toFixed(0)}%</small><div class="bar"><i style="width:${p*100}%;background:${colorFor(p)}"></i></div>`;
+    el.onclick = () => {
+      const F = cur.frames ? cur.frames.frames : []; const j = F.findIndex(f => f.gi === k); if (j>=0){ pause(); setIndex(j); }
+    };
+    strip.appendChild(el);
+  });
+  $("back").textContent = (sign && sign.back_translation) || "—";
+  // caption
+  if (cap) {
+    $("capText").textContent = cap.text || "—";
+    $("capBadge").textContent = `${cap.trust_badge} confidence`; $("capBadge").className = "badge " + cap.trust_badge;
+    $("capForced").textContent = cap.forced ? "Caption forced on: at least one sign failed read-back and was fingerspelled." : "";
+  }
+  // repair
+  minis.length = 0;
+  const rc = $("repairCard");
+  const rep = plan.repair;
+  if (rep && rep.type !== "hold"){
+    rc.hidden = false; $("repairPrompt").textContent = rep.reason;
+    const box = $("repairOpts"); box.innerHTML = "";
+    for (const [i, o] of rep.options.entries()){
+      const d = document.createElement("div"); d.className = "opt";
+      const btn = document.createElement("button"); btn.textContent = `${i + 1}. ${o.label || o.gloss_or_word}`; btn.className = "primary";
+      btn.style.minHeight = "56px";
+      if (rep.type === "disambiguate"){
+        const c = document.createElement("canvas"); c.width = 100; c.height = 100; c.setAttribute("aria-hidden", "true"); d.appendChild(c);
+        const clip = await signClip(o.gloss_or_word);
+        if (clip) minis.push({ctx: c.getContext("2d"), clip});
+        btn.onclick = () => run({...lastRes, [rep.token_index]: o.gloss_or_word});
+      } else {
+        btn.onclick = () => {
+          if (o.gloss_or_word === "SEND"){ rc.hidden = true; $("gatePill").textContent = "Emit (confirmed by you)"; play(); }
+          else { $("text").focus(); }
+        };
+      }
+      d.appendChild(btn); box.appendChild(d);
+    }
+    if (minis.length && !miniRunning){ miniRunning = true; requestAnimationFrame(miniLoop); }
+  } else rc.hidden = true;
+  // raw
+  $("timings").textContent = Object.entries(plan.timings_ms || {}).map(([k,v])=>`${k} ${v} ms`).join(" · ");
+  $("raw").textContent = JSON.stringify({frame:r.frame, plan:r.plan, readback:r.readback}, null, 1);
+  // player
+  if (r.frames){ $("scrub").max = r.frames.frames.length - 1; setIndex(0); }
+  else { $("scrub").max = 0; drawBody(stage, {brow:"neutral"}); $("nowGloss").textContent = ""; $("nowLetter").textContent = ""; $("clock").textContent = ""; }
+  if (plan.gate === "emit") play();     // repair/hold: never auto-play a guess
+}
+document.addEventListener("keydown", e => {
+  if ($("repairCard").hidden || e.target === $("text")) return;
+  const btns = $("repairOpts").querySelectorAll("button");
+  if (e.key === "1" && btns[0]) btns[0].click();
+  if (e.key === "2" && btns[1]) btns[1].click();
+  if (e.key === "Escape") { $("repairCard").hidden = true; $("text").focus(); }
+});
+
+drawBody(stage, {brow:"neutral"});
+run();
+</script>
+</body>
+</html>
