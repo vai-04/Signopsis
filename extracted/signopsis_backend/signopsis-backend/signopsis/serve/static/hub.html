@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIGNOPSIS</title>
+<style>
+:root{--bg:#f4f1ea;--panel:#fffdf8;--ink:#1f2328;--muted:#646a73;--line:#e2ddd2;--accent:#1f6f78;--ok:#2e7d4f;--warn:#b7791f}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15181c;--panel:#1d2127;--ink:#e7e9ec;--muted:#9aa1ab;--line:#2d333b;--accent:#5fb3bb;--ok:#5cc08a;--warn:#e0a84a}}
+:root[data-theme="dark"]{--bg:#15181c;--panel:#1d2127;--ink:#e7e9ec;--muted:#9aa1ab;--line:#2d333b;--accent:#5fb3bb;--ok:#5cc08a;--warn:#e0a84a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:960px;margin:0 auto;padding:32px 20px}
+h1{margin:0 0 4px;font-size:26px}
+p.lead{color:var(--muted);margin:0 0 24px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+a.card{display:block;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;color:inherit;text-decoration:none}
+a.card:hover{border-color:var(--accent)}
+a.card h2{margin:0 0 6px;font-size:18px}
+a.card span{color:var(--muted);font-size:14px}
+.status{margin-top:28px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.status h3{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+td,th{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600}
+.pill{font:600 12px ui-monospace,monospace;padding:2px 8px;border-radius:6px;color:#fff;background:var(--accent)}
+.on{color:var(--ok);font-weight:600}.off{color:var(--muted)}
+.modes button{font:inherit;margin:0 6px 6px 0;padding:5px 10px;border-radius:7px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+.modes button.cur{border-color:var(--accent);outline:2px solid var(--accent)}
+.overflow{overflow-x:auto}
+</style>
+</head>
+<body>
+<main>
+  <h1>SIGNOPSIS</h1>
+  <p class="lead">A two-way interpreter that tells you when it isn't sure. It carries uncertainty forward until someone can resolve it.</p>
+  <div class="grid">
+    <a class="card" href="/app/"><h2>SIGNOPSIS app</h2><span>The full web app (Converse, Live stage, Compose, Teach, Screen Glance, Diagnostics). Build it from the signopsis-web repo into signopsis/serve/web.</span></a>
+    <a class="card" href="/sign-to-text"><h2>Sign → text / voice</h2><span>Live camera. MediaPipe runs in your browser and only landmarks are sent to the server. Includes trust bars, repair questions and teaching your own signs. Works without a camera in simulation mode.</span></a>
+    <a class="card" href="/avatar"><h2>3D signer</h2><span>The cartoon avatar signs whatever you type, in real time. It can also mirror your hands from the webcam, and the pose lab lets you shape every finger. You can orbit, zoom and restyle it.</span></a>
+    <a class="card" href="/text-to-sign"><h2>Text → sign</h2><span>English, Hindi or Hinglish becomes ISL gloss and a pixel avatar. A round-trip check reads the avatar's signing back before it plays.</span></a>
+    <a class="card" href="/docs"><h2>API</h2><span>REST and WebSocket contracts (OpenAPI).</span></a>
+  </div>
+  <div class="status">
+    <h3>Mode manager</h3>
+    <div class="modes" id="modes"></div>
+    <div id="summary" style="margin:4px 0 10px"></div>
+    <div class="overflow"><table id="comp"><thead><tr><th>Component</th><th>VRAM (GPU build)</th><th>Resident</th><th>Note</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</main>
+<script>
+async function refresh(set){
+  const r = set ? await fetch("/api/mode",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:set})})
+                : await fetch("/api/mode");
+  const s = await r.json();
+  const modes = ["WATCH","SPEAK","CONVERSE","LISTEN","SCREEN"];
+  const box = document.getElementById("modes"); box.innerHTML = "";
+  for (const m of modes){ const b=document.createElement("button"); b.textContent=m; if(m===s.mode) b.className="cur"; b.onclick=()=>refresh(m); box.appendChild(b); }
+  document.getElementById("summary").innerHTML = `<span class="pill">${s.mode}</span> planned ${s.planned_vram_gb} GB of ${s.budget_gb} GB ${s.fits?"(fits)":"(over budget)"}${s.switch_ms!==undefined?` · switched in ${s.switch_ms} ms`:""}`;
+  const tb = document.querySelector("#comp tbody"); tb.innerHTML = "";
+  for (const [n,c] of Object.entries(s.components)){
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${n}</td><td>${c.vram_gb} GB</td><td class="${c.loaded?"on":"off"}">${c.loaded?"yes":"no"}</td><td>${c.note||""}</td>`;
+    tb.appendChild(tr);
+  }
+}
+refresh();
+</script>
+</body>
+</html>

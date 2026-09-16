@@ -1,0 +1,37 @@
+{
+  "name": "signopsis-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "SIGNOPSIS frontend: two-way sign language interpreter UI (mock mode or live backend)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build:single": "vite build --mode single",
+    "test": "node --test tests/*.test.mjs",
+    "install:backend-web": "vite build && node -e \"require('fs').cpSync('dist','../signopsis-backend/signopsis/serve/web',{recursive:true})\""
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.1",
+    "esbuild": "^0.28.2",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.0",
+    "vite-plugin-singlefile": "^2.3.3"
+  },
+  "dependencies": {
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/manrope": "^5.3.0",
+    "@react-three/drei": "^10.7.8",
+    "@react-three/fiber": "^9.7.0",
+    "framer-motion": "^13.4.0",
+    "lucide-react": "^1.46.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "three": "^0.186.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

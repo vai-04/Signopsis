@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIGNOPSIS Sign to Text</title>
+<style>
+:root{
+  --bg:#f4f1ea; --panel:#fffdf8; --ink:#1f2328; --muted:#646a73; --line:#e2ddd2;
+  --accent:#1f6f78; --emit:#2e7d4f; --repair:#b7791f; --hold:#b4443c; --chip:#f0ece3;
+  --stage:#1d2b3a; --stage2:#223447; --body:#3d5a80; --skinR:#f2c29b; --skinL:#d9a47c; --back:#b98460; --tip:#fff1e0;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#15181c; --panel:#1d2127; --ink:#e7e9ec; --muted:#9aa1ab; --line:#2d333b;
+  --accent:#5fb3bb; --emit:#5cc08a; --repair:#e0a84a; --hold:#e2766d; --chip:#262b33;
+}}
+:root[data-theme="dark"]{
+  --bg:#15181c; --panel:#1d2127; --ink:#e7e9ec; --muted:#9aa1ab; --line:#2d333b;
+  --accent:#5fb3bb; --emit:#5cc08a; --repair:#e0a84a; --hold:#e2766d; --chip:#262b33;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{padding:14px 24px 4px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header h1{font-size:20px;margin:0}
+header nav a{color:var(--accent);text-decoration:none;font-size:14px;margin-right:10px}
+#conn{margin-left:auto;font:12px ui-monospace,monospace;padding:3px 9px;border-radius:99px;border:1px solid var(--line)}
+#conn.ok{color:var(--emit);border-color:var(--emit)}#conn.bad{color:var(--hold);border-color:var(--hold)}
+main{display:grid;grid-template-columns:minmax(300px,560px) 1fr;gap:18px;padding:10px 24px 32px;max-width:1360px}
+@media (max-width:900px){main{grid-template-columns:1fr;padding:10px 16px}}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+h3{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+#stage{position:relative;background:#0e141b;border-radius:8px;overflow:hidden;aspect-ratio:4/3}
+#stage video,#stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#stage.mirror video,#stage.mirror canvas#overlay{transform:scaleX(-1)}
+#hud{position:absolute;left:8px;top:8px;right:8px;display:flex;gap:6px;flex-wrap:wrap;pointer-events:none}
+.tag{font:600 11.5px ui-monospace,monospace;padding:3px 7px;border-radius:5px;background:#000a;color:#fff}
+.tag.on{background:#2e7d4fcc}.tag.off{background:#b4443ccc}.tag.rec{background:#c0392b}
+#hint{position:absolute;left:8px;right:8px;bottom:8px;text-align:center;font-weight:600;color:#fff;text-shadow:0 1px 3px #000}
+#idle{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#c9ced6;background:#0e141bd9;text-align:center;padding:20px;font-size:14px;overflow-wrap:anywhere;overflow:auto}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+button,select,input[type=text]{font:inherit;border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:7px;padding:6px 11px}
+button{cursor:pointer}button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+input[type=text]{background:var(--bg);min-width:0;flex:1}
+input[type=range]{accent-color:var(--accent)}
+label.tog{font-size:13px;color:var(--muted);display:flex;gap:5px;align-items:center}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:12.5px;padding:3px 9px;border-radius:99px;background:var(--chip);border:1px solid var(--line);cursor:pointer}
+.muted{color:var(--muted);font-size:13px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0}
+.seg button.on{background:var(--accent);color:#fff}
+#partial{min-height:28px}
+.pg{font:600 12.5px ui-monospace,monospace;padding:3px 8px;border-radius:6px;border:1px dashed var(--line)}
+.gate{display:flex;align-items:center;gap:10px}
+.pill{font:700 12px ui-monospace,monospace;padding:4px 10px;border-radius:6px;color:#fff;text-transform:uppercase}
+.pill.emit{background:var(--emit)}.pill.repair{background:var(--repair)}.pill.hold{background:var(--hold)}
+.meter{height:8px;border-radius:4px;background:var(--chip);overflow:hidden;flex:1;min-width:80px}
+.meter i{display:block;height:100%}
+.caption{font-size:24px;font-weight:600;margin:10px 0 4px;min-height:32px}
+.caption .unsure{text-decoration:underline wavy var(--repair);text-underline-offset:4px}
+.slots{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.slot{border:1px solid var(--line);border-radius:7px;padding:5px 8px;background:var(--bg);font:600 13px ui-monospace,monospace;min-width:70px}
+.slot small{display:block;font:500 11px ui-monospace,monospace;color:var(--muted)}
+.slot .bar{height:3px;border-radius:2px;margin-top:4px;background:var(--chip)}
+.slot .bar i{display:block;height:100%}
+.slot.weak{border-color:var(--repair)}
+.badge{font:600 10.5px ui-monospace,monospace;padding:1px 5px;border-radius:4px;background:var(--chip);color:var(--muted);margin-left:4px}
+.advisory{background:color-mix(in srgb,var(--hold) 14%,transparent);border:1px solid var(--hold);border-radius:8px;padding:9px 12px;font-size:13.5px}
+.repair{border:2px solid var(--repair)}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:8px}
+.opt{border:1px solid var(--line);border-radius:8px;padding:8px;text-align:center;background:var(--bg);display:flex;flex-direction:column;gap:6px}
+.opt canvas{width:100%;aspect-ratio:1;image-rendering:pixelated;border-radius:6px;background:var(--stage)}
+.dots{display:flex;gap:6px}.dots i{width:14px;height:14px;border-radius:50%;background:var(--chip);border:1px solid var(--line)}
+.dots i.done{background:var(--emit);border-color:var(--emit)}
+.transcript{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow:auto}
+.line{display:flex;gap:8px;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:5px}
+.line time{font:11px ui-monospace,monospace;color:var(--muted)}
+.line .t{flex:1}
+pre{max-height:300px;overflow:auto;background:var(--bg);border-radius:8px;padding:10px;font-size:11.5px;white-space:pre-wrap;word-break:break-word}
+details summary{cursor:pointer;color:var(--muted);font-size:13px}
+.err{color:var(--hold)}
+#resultCard.stale{opacity:.5}
+#log{font:11.5px ui-monospace,monospace;color:var(--muted);max-height:90px;overflow:auto;overflow-wrap:anywhere}
+.signs li{display:flex;justify-content:space-between;align-items:center;padding:3px 0}
+.signs ul{list-style:none;margin:0;padding:0}
+</style>
+</head>
+<body>
+<header>
+  <h1>SIGNOPSIS · sign → text</h1>
+  <nav><a href="/">Hub</a><a href="/text-to-sign">Text → sign</a></nav>
+  <span id="conn" class="bad">offline</span>
+</header>
+<main>
+  <section class="col">
+    <div class="card">
+      <div id="stage" class="mirror">
+        <video id="video" playsinline muted></video>
+        <canvas id="overlay" width="640" height="480"></canvas>
+        <div id="idle">Start the camera, or switch to <b>&nbsp;Simulated&nbsp;</b> to test with no webcam.</div>
+        <div id="hud"></div>
+        <div id="hint"></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div class="seg" role="tablist">
+          <button id="srcCam" class="on">Camera</button><button id="srcSim">Simulated</button>
+        </div>
+        <button id="camBtn" class="primary">Start camera</button>
+        <label class="tog"><input type="checkbox" id="mirror" checked> mirror view</label>
+        <label class="tog"><input type="checkbox" id="showLm" checked> landmarks</label>
+        <span class="muted" id="fps"></span>
+      </div>
+      <div id="simPanel" hidden style="margin-top:10px">
+        <div class="row">
+          <input type="text" id="simText" value="I went to the bank yesterday." aria-label="sentence to simulate">
+          <button id="simPlay" class="primary">Sign it</button>
+        </div>
+        <div class="chips" id="simEx" style="margin-top:6px"></div>
+        <div class="row" style="margin-top:8px">
+          <label class="tog">conditions <input type="range" id="sev" min="0" max="1" step="0.1" value="0"></label>
+          <span class="muted" id="sevLbl">studio</span>
+          <label class="tog"><input type="checkbox" id="lefty"> left-handed signer</label>
+        </div>
+        <p class="muted" style="margin:6px 0 0">The simulator turns the text into ISL signing with the 2D avatar, converts it to MediaPipe-style landmarks and streams them over the same WebSocket a real camera uses. The dashed chips are special cases. <i>ambiguous</i> uses two near-identical signs, so it triggers a "which one?" question. The <i>unlisted</i> chips are signs the recognizer doesn't know, so you can try the teach flow.</p>
+      </div>
+      <div id="log"></div>
+    </div>
+
+    <div class="card">
+      <h3>Teach a sign</h3>
+      <div class="row">
+        <input type="text" id="teachLabel" placeholder="Meaning, e.g. Priya or bank" aria-label="meaning of the new sign">
+        <button id="teachBtn">Record 4 samples</button>
+      </div>
+      <div id="teachState" class="muted" style="margin-top:8px">A name sign, a regional variant or work jargon: sign it 4 times, lowering your hands between samples. No retraining is needed.</div>
+      <div class="dots" id="dots" style="margin-top:6px"></div>
+      <div class="signs" style="margin-top:10px"><h3>My signs</h3><ul id="mySigns"><li class="muted">none yet</li></ul></div>
+    </div>
+
+    <div class="card">
+      <h3>Settings</h3>
+      <div class="row">
+        <label class="tog">user <input type="text" id="user" value="default" style="width:110px;flex:none"></label>
+        <label class="tog">output <select id="lang"><option value="en">English</option><option value="hi">हिन्दी (review)</option></select></label>
+        <label class="tog">dominant hand <select id="dom"><option value="right">right</option><option value="left">left</option></select></label>
+        <label class="tog"><input type="checkbox" id="speak"> speak captions</label>
+      </div>
+    </div>
+  </section>
+
+  <section class="col">
+    <div class="card">
+      <h3>While you sign</h3>
+      <div id="partial" class="chips"><span class="muted">waiting for signing…</span></div>
+    </div>
+
+    <div id="advisory" class="advisory" hidden></div>
+
+    <div class="card" id="resultCard">
+      <h3>Result</h3>
+      <div class="gate"><span class="pill" id="gatePill">-</span><div class="meter"><i id="trustBar"></i></div><span class="muted" id="trustNum"></span></div>
+      <div class="caption" id="caption"></div>
+      <div class="muted" id="reason"></div>
+      <div class="slots" id="slots"></div>
+      <div class="muted" id="timings" style="margin-top:6px"></div>
+    </div>
+
+    <div class="card repair" id="repairCard" hidden>
+      <h3 id="repairTitle">Repair</h3>
+      <div id="repairPrompt" style="font-weight:600"></div>
+      <div class="opts" id="repairOpts"></div>
+    </div>
+
+    <div class="card">
+      <h3>Transcript</h3>
+      <div class="transcript" id="transcript"><span class="muted">Captions you've confirmed appear here.</span></div>
+    </div>
+
+    <div class="card">
+      <details><summary>Raw contracts (PerceptEvent, SemanticFrame, RenderPlan)</summary><pre id="raw"></pre></details>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+import { CameraSource, drawLandmarks } from "/static/mp_client.js";
+import { drawFrame } from "/static/pixel.js";
+
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const logLine = m => { const d = document.createElement("div"); d.textContent = m; $("log").prepend(d); };
+const overlay = $("overlay").getContext("2d");
+
+/* ---------------------------------------------------------------- websocket */
+let ws = null, wsReady = false, lastResult = null, source = "cam";
+function connect() {
+  const q = new URLSearchParams({ user: $("user").value || "default", lang: $("lang").value, dominant: $("dom").value });
+  ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/sign?${q}`);
+  ws.onopen = () => { wsReady = true; $("conn").textContent = "connected"; $("conn").className = "ok"; };
+  ws.onclose = () => { wsReady = false; $("conn").textContent = "offline, retrying"; $("conn").className = "bad"; setTimeout(connect, 1500); };
+  ws.onmessage = ev => onEvent(JSON.parse(ev.data));
+}
+function send(m) { if (wsReady && ws.bufferedAmount < 2e6) ws.send(JSON.stringify(m)); }
+["lang", "dom"].forEach(id => $(id).onchange = () => send({ type: "config", out_lang: $("lang").value, dominant: $("dom").value }));
+$("user").onchange = () => { ws && ws.close(); };
+
+/* ---------------------------------------------------------------- events */
+function onEvent(e) {
+  switch (e.type) {
+    case "hello": renderSigns(e.signs); logLine(`session for "${e.user}", ${e.vocabulary.length} base signs`); break;
+    case "live": renderHud(e); break;
+    case "phrase_start": $("partial").innerHTML = `<span class="tag rec">● signing</span>`; $("resultCard").classList.add("stale"); break;
+    case "partial": renderPartial(e.gloss); break;
+    case "result": renderResult(e); break;
+    case "teach_offer": renderTeachOffer(e); break;
+    case "enroll_progress": renderEnroll(e); break;
+    case "enrolled": renderEnrolled(e); break;
+    case "signs": renderSigns(e.signs); break;
+    case "repair_done": $("repairCard").hidden = true; break;
+    case "error": logLine("error: " + e.message); break;
+  }
+}
+
+function renderHud(e) {
+  const t = (txt, cls) => `<span class="tag ${cls}">${txt}</span>`;
+  $("hud").innerHTML = [
+    e.signing ? t("● signing", "rec") : t("idle", ""),
+    e.enrolling ? t("teaching", "rec") : "",
+    t("R hand", e.hands.R ? "on" : "off"), t("L hand", e.hands.L ? "on" : "off"),
+    t("body", e.anchor ? "on" : "off"),
+    e.lux != null ? t(`light ${Math.round(e.lux)}`, e.lux < 40 ? "off" : "on") : "",
+    e.brow !== "neutral" ? t(`brows ${e.brow}`, "") : "",
+  ].join("");
+  $("hint").textContent = e.hint || "";
+}
+
+function renderPartial(gl) {
+  $("partial").innerHTML = `<span class="tag rec">● signing</span>` + gl.map(g => `<span class="pg">${g}</span>`).join("");
+}
+
+const colorFor = p => p >= .75 ? css("--emit") : p >= .4 ? css("--repair") : css("--hold");
+const shown = g => g.startsWith("FS:") ? g.slice(3)[0] + g.slice(4).toLowerCase() : g;
+
+function renderResult(r) {
+  lastResult = r;
+  $("resultCard").classList.remove("stale");
+  const plan = r.plan, cap = plan.targets.find(t => t.kind === "caption");
+  const trust = r.frame ? r.frame.trust : 0;
+  $("gatePill").textContent = plan.gate; $("gatePill").className = "pill " + plan.gate;
+  $("trustBar").style.width = (trust * 100) + "%"; $("trustBar").style.background = colorFor(trust);
+  $("trustNum").textContent = r.frame ? `trust ${trust.toFixed(2)} · coverage ${Math.round((r.percept.quality.coverage ?? 1) * 100)}%` : "";
+  $("reason").textContent = plan.gate_reason;
+  $("advisory").hidden = !plan.advisory; $("advisory").textContent = plan.advisory || "";
+  // caption: underline words grounded on weak slots
+  const capEl = $("caption"); capEl.innerHTML = "";
+  const text = plan.gate === "hold" ? "" : (cap ? cap.text : "");
+  if (plan.gate === "hold") capEl.innerHTML = `<span class="muted" style="font-size:16px;font-weight:500">Nothing shown. I won't guess.</span>`;
+  else if (r.frame) {
+    const weak = new Set(r.slots.map((s, i) => s.trust < .75 ? i : -1).filter(i => i >= 0));
+    let pos = 0;
+    const spans = [...r.frame.grounding].sort((a, b) => a.span[0] - b.span[0]);
+    for (const g of spans) {
+      if (g.span[0] > pos) capEl.append(text.slice(pos, g.span[0]));
+      const s = document.createElement("span");
+      s.textContent = text.slice(g.span[0], g.span[1]);
+      if (weak.has(g.gloss_index)) s.className = "unsure";
+      s.title = `from sign ${g.gloss_index + 1} · ${g.t[0]}–${g.t[1]} ms`;
+      capEl.append(s); pos = Math.max(pos, g.span[1]);
+    }
+    capEl.append(text.slice(pos));
+  }
+  // slots
+  $("slots").innerHTML = "";
+  r.slots.forEach((s, i) => {
+    const el = document.createElement("div");
+    el.className = "slot" + (s.trust < .75 ? " weak" : "");
+    const src = s.kind === "fs" ? "spelled" : s.kind === "unknown" ? "unknown" : s.source !== "lattice" ? s.source : "";
+    el.title = `seen: ${s.visual.map(([g, p]) => `${shown(g)} ${(p * 100).toFixed(0)}%`).join(", ")}\nafter context: ${s.post.map(([g, p]) => `${shown(g)} ${(p * 100).toFixed(0)}%`).join(", ")}\n` +
+               Object.entries(s.signals).map(([k, v]) => `${k} ${v}`).join(" · ");
+    el.innerHTML = `${s.display}${src ? `<span class="badge">${src}</span>` : ""}${s.negated ? `<span class="badge">head shake</span>` : ""}
+      <small>trust ${(s.trust * 100).toFixed(0)}%</small><div class="bar"><i style="width:${s.trust * 100}%;background:${colorFor(s.trust)}"></i></div>`;
+    $("slots").appendChild(el);
+  });
+  $("timings").textContent = Object.entries(plan.timings_ms || {}).map(([k, v]) => `${k} ${v} ms`).join(" · ");
+  $("partial").innerHTML = `<span class="muted">waiting for signing…</span>`;
+  renderRepair(r);
+  if (plan.gate === "emit" && text) addTranscript(text, cap.trust_badge, plan.targets.find(t => t.kind === "tts"));
+  $("raw").textContent = JSON.stringify({ percept: r.percept, frame: r.frame, plan: r.plan }, null, 1);
+}
+
+async function signClip(g) {
+  try { const r = await fetch(`/api/sign/${encodeURIComponent(g)}`); return r.ok ? r.json() : null; } catch { return null; }
+}
+const minis = []; let miniOn = false;
+function miniLoop(now) {
+  for (const m of minis) { const F = m.clip.frames; drawFrame(m.ctx, F[Math.floor(now / (1000 / m.clip.fps)) % F.length]); }
+  if (minis.length) requestAnimationFrame(miniLoop); else miniOn = false;
+}
+
+async function renderRepair(r) {
+  const plan = r.plan, rep = plan.repair, card = $("repairCard");
+  minis.length = 0;
+  if (!rep) { card.hidden = true; return; }
+  card.hidden = false;
+  $("repairTitle").textContent = { disambiguate: "Which one?", resign: plan.gate === "hold" ? "Didn't catch that" : "Check", teach: "Teach me" }[rep.type] || "Repair";
+  $("repairPrompt").textContent = rep.prompt;
+  const box = $("repairOpts"); box.innerHTML = "";
+  for (const o of rep.options) {
+    const d = document.createElement("div"); d.className = "opt";
+    if (o.clip) {
+      const c = document.createElement("canvas"); c.width = 100; c.height = 100; d.appendChild(c);
+      const clip = await signClip(o.gloss);
+      if (clip) minis.push({ ctx: c.getContext("2d"), clip });
+    }
+    const b = document.createElement("button");
+    b.textContent = o.label; b.className = o.gloss.startsWith("__") ? "" : "primary";
+    b.onclick = () => {
+      if (o.gloss === "__teach__") { send({ type: "repair_choice", frame_id: plan.frame_id, slot: rep.slot, choice: "__teach__" }); return; }
+      send({ type: "repair_choice", frame_id: plan.frame_id, slot: rep.slot, choice: o.gloss });
+      card.hidden = true;
+    };
+    d.appendChild(b); box.appendChild(d);
+  }
+  if (minis.length && !miniOn) { miniOn = true; requestAnimationFrame(miniLoop); }
+}
+
+function renderTeachOffer(e) {
+  const card = $("repairCard"); card.hidden = false; minis.length = 0;
+  $("repairTitle").textContent = "New sign?";
+  $("repairPrompt").textContent = e.prompt;
+  $("repairOpts").innerHTML = `<div class="opt"><input type="text" id="offerLabel" placeholder="What does it mean?"><button class="primary" id="offerGo">Teach (${e.samples} of ${e.need} samples already captured)</button></div>`;
+  $("offerGo").onclick = () => {
+    const label = $("offerLabel").value.trim();
+    if (!label) return;
+    send({ type: "enroll_from_unknown", label }); card.hidden = true;
+  };
+}
+
+function dots(have, need) { $("dots").innerHTML = Array.from({ length: need }, (_, i) => `<i class="${i < have ? "done" : ""}"></i>`).join(""); }
+function renderEnroll(e) {
+  if (e.cancelled) { $("teachState").textContent = "Cancelled."; dots(0, 0); $("teachBtn").textContent = "Record 4 samples"; return; }
+  dots(e.have, e.need);
+  $("teachBtn").textContent = "Cancel";
+  $("teachState").innerHTML = (e.warning ? `<span class="err">${e.warning}</span> ` : "") +
+    `Teaching <b>${e.display || e.label}</b>: sign it now (${Math.min(e.have + 1, e.need)} of ${e.need}), then lower your hands.`;
+  if (source === "sim") $("teachState").innerHTML += ` <span class="muted">In simulation, click an <i>unlisted</i> chip for each sample.</span>`;
+}
+function renderEnrolled(e) {
+  dots(4, 4);
+  $("teachBtn").textContent = "Record 4 samples";
+  $("teachState").innerHTML = `Learned <b>${e.display}</b> (${e.prototypes} prototypes, spread ${e.consistency}).` + (e.warning ? ` <span class="err">${e.warning}</span>` : "") + " Try it now.";
+}
+$("teachBtn").onclick = () => {
+  if ($("teachBtn").textContent === "Cancel") { send({ type: "enroll_cancel" }); return; }
+  const label = $("teachLabel").value.trim();
+  if (!label) { $("teachLabel").focus(); return; }
+  send({ type: "enroll_start", label });
+};
+function renderSigns(list) {
+  const ul = $("mySigns"); ul.innerHTML = "";
+  if (!list.length) { ul.innerHTML = `<li class="muted">none yet</li>`; return; }
+  for (const s of list) {
+    const li = document.createElement("li");
+    li.innerHTML = `<span>${s.display} <span class="muted">(${s.samples} samples)</span></span>`;
+    const b = document.createElement("button"); b.textContent = "Forget";
+    b.onclick = () => send({ type: "forget_sign", label: s.display || s.label });
+    li.appendChild(b); ul.appendChild(li);
+  }
+}
+
+function addTranscript(text, badge, tts) {
+  const box = $("transcript");
+  if (box.querySelector(".muted")) box.innerHTML = "";
+  const d = document.createElement("div"); d.className = "line";
+  d.innerHTML = `<time>${new Date().toLocaleTimeString()}</time><span class="t"></span><span class="badge">${badge}</span>`;
+  d.querySelector(".t").textContent = text;
+  const b = document.createElement("button"); b.textContent = "Speak"; b.title = "read aloud"; b.onclick = () => speak(text, tts);
+  d.appendChild(b);
+  box.prepend(d);
+  if ($("speak").checked) speak(text, tts);
+}
+function speak(text, tts) {
+  if (!("speechSynthesis" in window)) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = $("lang").value === "hi" ? "hi-IN" : "en-IN";
+  if (tts) { u.rate = tts.rate; u.pitch = tts.pitch; u.volume = tts.volume; }
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
+}
+
+/* ---------------------------------------------------------------- camera */
+let cam = null;
+$("mirror").onchange = () => $("stage").classList.toggle("mirror", $("mirror").checked);
+$("camBtn").onclick = async () => {
+  if (cam && cam.running) { cam.stop(); $("camBtn").textContent = "Start camera"; $("idle").hidden = false; return; }
+  $("camBtn").disabled = true; $("idle").textContent = "Loading MediaPipe…";
+  try {
+    cam = cam || new CameraSource({
+      video: $("video"), log: logLine,
+      onFrame: f => send(f),
+      onLandmarks: f => {
+        const c = $("overlay"); if (c.width !== f.w) { c.width = f.w; c.height = f.h; }
+        if ($("showLm").checked) drawLandmarks(overlay, f); else overlay.clearRect(0, 0, c.width, c.height);
+        $("fps").textContent = `${cam.fps.toFixed(0)} fps`;
+      },
+    });
+    send({ type: "reset" });
+    await cam.start();
+    $("idle").hidden = true; $("camBtn").textContent = "Stop camera";
+  } catch (e) {
+    $("idle").innerHTML = `<span class="err">Camera or MediaPipe failed: ${e.message || e}</span><br>Allow camera access, or run <code>python scripts/fetch_models.py</code> for offline models. Simulated mode works without either.`;
+    logLine("camera error: " + (e.message || e));
+  } finally { $("camBtn").disabled = false; }
+};
+
+/* ---------------------------------------------------------------- simulation */
+const SIM_EX = ["I went to the bank yesterday.", "What is your name?", "Do you want water?", "I don't understand.",
+                "My name is Priya.", "I have pain, I need medicine.", "Are you sick?", "Tomorrow I will go to school"];
+for (const ex of SIM_EX) { const c = document.createElement("span"); c.className = "chip"; c.textContent = ex; c.onclick = () => { $("simText").value = ex; simulate(); }; $("simEx").appendChild(c); }
+for (const [lbl, gl] of [["ambiguous: ME RIVER GO", "ME,RIVER,GO"], ["unlisted: name sign", "DEMO-NAMESIGN"], ["MY NAME + unlisted", "MY,NAME,DEMO-NAMESIGN"], ["unlisted: jargon sign", "DEMO-JARGON"]]) {
+  const c = document.createElement("span"); c.className = "chip"; c.textContent = lbl; c.style.borderStyle = "dashed";
+  c.onclick = () => simulate(gl); $("simEx").appendChild(c);
+}
+const sevNames = ["studio", "good", "good", "ok", "ok", "dim / noisy", "dim / noisy", "poor", "poor", "bad", "awful"];
+$("sev").oninput = () => $("sevLbl").textContent = sevNames[Math.round($("sev").value * 10)];
+function setSource(s) {
+  source = s;
+  $("srcCam").classList.toggle("on", s === "cam"); $("srcSim").classList.toggle("on", s === "sim");
+  $("simPanel").hidden = s !== "sim"; $("camBtn").hidden = s !== "cam";
+  if (s === "sim" && cam && cam.running) { cam.stop(); $("camBtn").textContent = "Start camera"; }
+  $("idle").hidden = s === "sim"; $("stage").classList.toggle("mirror", s === "cam" && $("mirror").checked);
+  if (s === "sim") { overlay.fillStyle = "#0e141b"; overlay.fillRect(0, 0, $("overlay").width, $("overlay").height); }
+}
+$("srcCam").onclick = () => setSource("cam");
+$("srcSim").onclick = () => setSource("sim");
+let simTimer = null, simSeed = 1;
+async function simulate(gloss) {
+  clearTimeout(simTimer);
+  const q = new URLSearchParams({ severity: $("sev").value, lefty: $("lefty").checked, seed: simSeed++, t0: performance.now().toFixed(0) });
+  if (gloss) q.set("gloss", gloss); else q.set("text", $("simText").value);
+  const r = await fetch(`/api/simcam?${q}`);
+  if (!r.ok) { logLine("simulator: " + (await r.text())); return; }
+  const { frames, info, degrade } = await r.json();
+  logLine(`simulating ${info.signed.join(" ")} · noise ${degrade.noise} · dropout ${degrade.dropout} · light ${Math.round(degrade.lux)}`);
+  if ($("dom").value !== (degrade.lefty ? "left" : "right")) { $("dom").value = degrade.lefty ? "left" : "right"; send({ type: "config", dominant: $("dom").value }); }
+  const c = $("overlay"); c.width = 640; c.height = 480;
+  const start = performance.now(), base = frames[0].t;
+  let i = 0;
+  const tick = () => {
+    const now = performance.now() - start;
+    while (i < frames.length && frames[i].t - base <= now) {
+      const f = { ...frames[i], t: start + (frames[i].t - base) };
+      send(f);
+      if ($("showLm").checked) drawLandmarks(overlay, f, { background: "#0e141b" });
+      i++;
+    }
+    if (i < frames.length) simTimer = setTimeout(tick, 15);
+    else simTimer = setTimeout(() => send({ type: "flush" }), 700);   // the simulated signer steps away
+  };
+  tick();
+}
+$("simPlay").onclick = () => simulate();
+$("simText").addEventListener("keydown", e => { if (e.key === "Enter") simulate(); });
+
+connect();
+</script>
+</body>
+</html>

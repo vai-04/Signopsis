@@ -1,0 +1,1 @@
+import{w as e}from"./cx-DJMe-dbJ.js";import{o as t}from"./index-VYElz2vR.js";var n=e();function r(){return(0,n.jsxs)(`div`,{className:`mx-auto max-w-[1500px]`,children:[(0,n.jsx)(`h1`,{className:`sr-only`,children:`Converse`}),(0,n.jsx)(t,{})]})}export{r as default};

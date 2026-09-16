@@ -1,0 +1,6 @@
+setu/serve/static/vendor/
+data/
+__pycache__/
+*.pyc
+.pytest_cache/
+dist/
