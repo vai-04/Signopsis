@@ -1,0 +1,10 @@
+.env
+data/
+!data/.gitkeep
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+node_modules/
+dist/
+third_party/

@@ -1,0 +1,107 @@
+{
+  "fitted_tau": 0.0097,
+  "current_tau": 0.08,
+  "at": {
+    "current": {
+      "tau": 0.08,
+      "ece": 0.102,
+      "confidently_wrong_rate": 0.0,
+      "emit_rate": 0.823,
+      "reliability_bins": [
+        [
+          0.255,
+          0.545,
+          11
+        ],
+        [
+          0.355,
+          0.909,
+          22
+        ],
+        [
+          0.461,
+          0.776,
+          58
+        ],
+        [
+          0.545,
+          0.958,
+          71
+        ],
+        [
+          0.653,
+          1.0,
+          61
+        ],
+        [
+          0.752,
+          1.0,
+          67
+        ],
+        [
+          0.856,
+          1.0,
+          115
+        ],
+        [
+          0.987,
+          1.0,
+          855
+        ]
+      ]
+    },
+    "fitted": {
+      "tau": 0.0097,
+      "ece": 0.0094,
+      "confidently_wrong_rate": 0.0016,
+      "emit_rate": 0.974,
+      "reliability_bins": [
+        [
+          0.47,
+          0.0,
+          2
+        ],
+        [
+          0.551,
+          0.333,
+          18
+        ],
+        [
+          0.646,
+          0.462,
+          13
+        ],
+        [
+          0.75,
+          1.0,
+          10
+        ],
+        [
+          0.864,
+          0.818,
+          11
+        ],
+        [
+          0.999,
+          1.0,
+          1206
+        ]
+      ]
+    }
+  },
+  "roundtrip_intelligibility_low_noise": 1.0,
+  "accuracy_all_noise": 0.982,
+  "naive_argmax_wrong_rate": 0.0183,
+  "most_confused": [
+    "HE-SHE->GO",
+    "HE-SHE->THEY",
+    "MOTHER->MY",
+    "RIVER->WATER",
+    "WATER->RIVER",
+    "WE->ME",
+    "WHAT->WANT",
+    "WHEN->YOU",
+    "WHERE->WHEN",
+    "WHERE->WHO"
+  ]
+}

@@ -1,0 +1,60 @@
+[project]
+name = "setu"
+version = "0.1.0"
+description = "SETU — bidirectional, multilingual accessibility interpreter (local-first)"
+readme = "README.md"
+license-files = ["LICENSES.md"]
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+    "numpy>=1.26,<2.3",
+    "python-dotenv>=1.0",
+    "python-ulid>=2.7",
+]
+
+[project.optional-dependencies]
+asr = [
+    "torch>=2.7,<2.10",
+    "torchaudio==2.9.1",
+    "nemo-toolkit[asr]>=2.4",
+    "silero-vad>=5.1",
+    "onnxruntime-gpu>=1.20",
+    "nvidia-ml-py>=12.0",
+]
+fallback = [
+    "faster-whisper>=1.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27",
+]
+
+[build-system]
+requires = ["uv_build>=0.8,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = "backend"
+module-name = "setu"
+
+[tool.uv]
+environments = ["sys_platform == 'linux'"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchaudio = { index = "pytorch-cu128" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+pythonpath = ["backend"]
+markers = ["gpu: needs CUDA and downloaded models"]
